@@ -5,21 +5,22 @@ import torch.nn.functional as F
 from torch import optim
 from models.dispnet import DispNet
 from utils.dataloader import sceneflowlist, SceneFlowdataLoader
-
+"""
+KITTI2015 = 'E:/KITTIStereo2015_data_scene_flow/training/'
+"""
 # 命令行参数
 parser = argparse.ArgumentParser(description='DispNet')
 parser.add_argument('--maxdisp', type=int, default=192,
                     help='maximum disparity')
 parser.add_argument('--model', default='dispnets',
                     help='select model')
-# parser.add_argument('--datapath', default='E:/KITTIStereo2015_data_scene_flow/training/',
 parser.add_argument('--datapath', default='E:\scene_flow_dataset/',
                     help='datapath')
 parser.add_argument('--epochs', type=int, default=10,
                     help='number of epochs to train')
 parser.add_argument('--batch-size', type=int, default=12,
                     help='batch_size')
-parser.add_argument('--loadmodel', default=None,
+parser.add_argument('--loadmodel', default='./pretrained/checkpoint_0.tar',
                     help='load model')
 parser.add_argument('--savemodel', default='./pretrained/',
                     help='save model')
@@ -55,6 +56,7 @@ else:
 # SceneFlow数据集
 all_left_img, all_right_img, all_left_disp, \
 test_left_img, test_right_img, test_left_disp = sceneflowlist.dataloader(args.datapath)
+
 trainloader = torch.utils.data.DataLoader(
          SceneFlowdataLoader.myImageFloder(all_left_img, all_right_img, all_left_disp, True),
          batch_size=args.batch_size, shuffle=True, num_workers=4, drop_last=False)
@@ -70,10 +72,6 @@ elif args.model == 'dispnetc':
     model = DispNet.DispNetC(args.maxdisp)
 else:
     print('no model')
-# 多卡训练
-# if args.cuda:
-#     model = nn.DataParallel(model)
-#     model.to(device)
 # 加载预训练模型
 if args.loadmodel is not None:
     print('Load pretrained model')
@@ -123,6 +121,7 @@ def test(imgL, imgR, disp_true):
     imgL, imgR, disp_true = imgL.to(device), imgR.to(device), disp_true.to(device)
     # 视差图掩膜
     mask = disp_true < 192
+    # 维度调整
     if imgL.shape[2] % 64 != 0:
         times = imgL.shape[2] // 64
         top_pad = (times + 1) * 64 - imgL.shape[2]
@@ -139,13 +138,13 @@ def test(imgL, imgR, disp_true):
     imgR = F.pad(imgR, (0, right_pad, top_pad, 0))
 
     with torch.no_grad():
-        output3 = model(imgL, imgR)
-        output3 = torch.squeeze(output3)
-
+        output = model(imgL, imgR)
+        output = torch.squeeze(output)
+    # 维度裁剪
     if top_pad != 0:
-        img = output3[:, top_pad:, :]
+        img = output[:, top_pad:, :]
     else:
-        img = output3
+        img = output
     if right_pad != 0:
         img = img[:, :, :-right_pad]
     else:
@@ -154,7 +153,7 @@ def test(imgL, imgR, disp_true):
     if len(disp_true[mask]) == 0:
         loss = 0
     else:
-        # torch.mean(torch.abs(img[mask]-disp_true[mask]))  # end-point-error
+        # loss = torch.mean(torch.abs(img[mask]-disp_true[mask]))  # end-point-error
         loss = F.l1_loss(img[mask], disp_true[mask])
 
     return loss.data.cpu()
@@ -174,7 +173,6 @@ def main():
         print('This is %d-th epoch' % epoch)
         total_train_loss = 0
         adjust_learning_rate(optimizer, epoch)
-
         for batch_idx, (imgL_crop, imgR_crop, disp_crop_L) in enumerate(trainloader):
             start_time = time.time()
             loss = train_dispnet(imgL_crop, imgR_crop, disp_crop_L)
@@ -185,7 +183,7 @@ def main():
         print('epoch %d total training loss = %.3f' % (epoch, total_train_loss/len(trainloader)))
         break
 
-       #SAVE
+        # SAVE model
         savefilename = args.savemodel+'/checkpoint_'+str(epoch)+'.tar'
         torch.save({
              'epoch': epoch,
@@ -193,22 +191,19 @@ def main():
              'train_loss': total_train_loss/len(trainloader),
         }, savefilename)
 
-    print('full training time = %.2f h' %((time.time() - start_full_time)/3600))
-    #
-    # #------------- TEST ------------------------------------------------------------
-    # total_test_loss = 0
-    # for batch_idx, (imgL, imgR, disp_L) in enumerate(testloader):
-    #        test_loss = test(imgL, imgR, disp_L)
-    #        print('Iter %d test loss = %.3f' %(batch_idx, test_loss))
-    #        total_test_loss += test_loss
-    #
-    # print('total test loss = %.3f' %(total_test_loss/len(testloader)))
-    # #----------------------------------------------------------------------------------
-    # #SAVE test information
-    # savefilename = args.savemodel+'testinformation.tar'
-    # torch.save({
-    #         'test_loss': total_test_loss/len(testloader),
-    #     }, savefilename)
+    print('full training time = %.2f h' % ((time.time() - start_full_time)/3600))
+
+    # ------------------------------ TEST ---------------------------------------
+    total_test_loss = 0
+    for batch_idx, (imgL, imgR, disp_L) in enumerate(testloader):
+        test_loss = test(imgL, imgR, disp_L)
+        print('Iter %d test loss = %.3f' % (batch_idx, test_loss))
+        total_test_loss += test_loss
+    print('total test loss = %.3f' % (total_test_loss/len(testloader)))
+    # ---------------------------------------------------------------------------
+    # SAVE test information
+    savefilename = args.savemodel+'testinformation.tar'
+    torch.save({'test_loss': total_test_loss/len(testloader), }, savefilename)
 
 
 if __name__ == '__main__':

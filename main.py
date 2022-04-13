@@ -3,11 +3,16 @@ import time
 import torch
 import torch.nn.functional as F
 from torch import optim
+from torch.utils.tensorboard import SummaryWriter
+
 from models.dispnet import DispNet
 from utils.dataloader import sceneflowlist, SceneFlowdataLoader
 """
 KITTI2015 = 'E:/KITTIStereo2015_data_scene_flow/training/'
 """
+
+use_tensorboard = True
+
 # 命令行参数
 parser = argparse.ArgumentParser(description='DispNet')
 parser.add_argument('--maxdisp', type=int, default=192,
@@ -170,6 +175,10 @@ def adjust_learning_rate(optimizer, epoch):
 def main():
     start_full_time = time.time()
     for epoch in range(0, args.epochs):
+
+        if use_tensorboard:
+            writer = SummaryWriter(log_dir='./log_event', filename_suffix=str(epoch), flush_secs=120)
+
         print('This is %d-th epoch' % epoch)
         total_train_loss = 0
         adjust_learning_rate(optimizer, epoch)
@@ -178,10 +187,10 @@ def main():
             loss = train_dispnet(imgL_crop, imgR_crop, disp_crop_L)
             print('Iter %d training loss = %.3f , time = %.2f' % (batch_idx, loss, time.time() - start_time))
             total_train_loss += loss
-            if batch_idx == 1:
-                break
         print('epoch %d total training loss = %.3f' % (epoch, total_train_loss/len(trainloader)))
-        break
+        if use_tensorboard:
+            writer.add_scalar('Training Loss', total_train_loss / len(trainloader), epoch)
+            writer.flush()
 
         # SAVE model
         savefilename = args.savemodel+'/checkpoint_'+str(epoch)+'.tar'

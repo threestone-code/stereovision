@@ -10,14 +10,14 @@ from utils.dataloader import sceneflowlist, SceneFlowdataLoader
 parser = argparse.ArgumentParser(description='DispNet')
 parser.add_argument('--maxdisp', type=int, default=192,
                     help='maximum disparity')
-parser.add_argument('--model', default='dispnetc',
+parser.add_argument('--model', default='dispnets',
                     help='select model')
 # parser.add_argument('--datapath', default='E:/KITTIStereo2015_data_scene_flow/training/',
 parser.add_argument('--datapath', default='E:\scene_flow_dataset/',
                     help='datapath')
 parser.add_argument('--epochs', type=int, default=10,
                     help='number of epochs to train')
-parser.add_argument('--batch-size', type=int, default=6,
+parser.add_argument('--batch-size', type=int, default=12,
                     help='batch_size')
 parser.add_argument('--loadmodel', default=None,
                     help='load model')
@@ -55,8 +55,6 @@ else:
 # SceneFlow数据集
 all_left_img, all_right_img, all_left_disp, \
 test_left_img, test_right_img, test_left_disp = sceneflowlist.dataloader(args.datapath)
-print('batch num:\t', len(all_left_disp) // 12)
-
 trainloader = torch.utils.data.DataLoader(
          SceneFlowdataLoader.myImageFloder(all_left_img, all_right_img, all_left_disp, True),
          batch_size=args.batch_size, shuffle=True, num_workers=4, drop_last=False)

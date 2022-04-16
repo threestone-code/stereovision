@@ -1,5 +1,3 @@
-import math
-
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -10,7 +8,7 @@ mode 0: 反卷积
 mode 1: 反卷积 + 卷积
 mode 2: 双线性插值 + 卷积
 """
-upsample_mode = 3
+upsample_mode = 0
 
 def conv2d(in_channels, out_channels, kernel_size, stride, padding):
     return nn.Sequential(
@@ -81,49 +79,65 @@ class DispNetS(nn.Module):
             self.upconv3 = convTranspose2d(769, 128, 4, 2, 1)
             self.upconv2 = convTranspose2d(385, 64, 4, 2, 1)
             self.upconv1 = convTranspose2d(193, 32, 4, 2, 1)
-        else:
-            self.upconv5 = convTranspose2d(1024, 512, 4, 2, 1)
-            self.upconv4 = convTranspose2d(512, 256, 4, 2, 1)
-            self.upconv3 = convTranspose2d(256, 128, 4, 2, 1)
-            self.upconv2 = convTranspose2d(128, 64, 4, 2, 1)
-            self.upconv1 = convTranspose2d(64, 32, 4, 2, 1)
 
-        if upsample_mode == 2:
-            self.iconv5 = conv2d(1025+512, 512, 3, 1, 1)
-            self.iconv4 = conv2d(769+256, 256, 3, 1, 1)
-            self.iconv3 = conv2d(385+128, 128, 3, 1, 1)
-            self.iconv2 = conv2d(193+64, 64, 3, 1, 1)
-            self.iconv1 = conv2d(97+32, 32, 3, 1, 1)
-        else:
-            self.iconv5 = conv2d(1025, 512, 3, 1, 1)
-            self.iconv4 = conv2d(769, 256, 3, 1, 1)
-            self.iconv3 = conv2d(385, 128, 3, 1, 1)
-            self.iconv2 = conv2d(193, 64, 3, 1, 1)
-            self.iconv1 = conv2d(97, 32, 3, 1, 1)
-
-        self.catpr6 = convTranspose2d(1, 1, 4, 2, 1)
-        self.catpr5 = convTranspose2d(1, 1, 4, 2, 1)
-        self.catpr4 = convTranspose2d(1, 1, 4, 2, 1)
-        self.catpr3 = convTranspose2d(1, 1, 4, 2, 1)
-        self.catpr2 = convTranspose2d(1, 1, 4, 2, 1)
-
-        # predict results
-        if upsample_mode == 0:
+            self.catpr6 = convTranspose2d(1, 1, 4, 2, 1)
+            self.catpr5 = convTranspose2d(1, 1, 4, 2, 1)
+            self.catpr4 = convTranspose2d(1, 1, 4, 2, 1)
+            self.catpr3 = convTranspose2d(1, 1, 4, 2, 1)
+            self.catpr2 = convTranspose2d(1, 1, 4, 2, 1)
+            # predict results
             self.pr6out = nn.Conv2d(1024, 1, 3, 1, 1)
             self.pr5out = nn.Conv2d(1025, 1, 3, 1, 1)
             self.pr4out = nn.Conv2d(769, 1, 3, 1, 1)
             self.pr3out = nn.Conv2d(385, 1, 3, 1, 1)
             self.pr2out = nn.Conv2d(193, 1, 3, 1, 1)
             self.pr1out = nn.Conv2d(97, 1, 3, 1, 1)
-        else:
+        elif upsample_mode == 1:
+            self.upconv5 = convTranspose2d(1024, 512, 4, 2, 1)
+            self.upconv4 = convTranspose2d(512, 256, 4, 2, 1)
+            self.upconv3 = convTranspose2d(256, 128, 4, 2, 1)
+            self.upconv2 = convTranspose2d(128, 64, 4, 2, 1)
+            self.upconv1 = convTranspose2d(64, 32, 4, 2, 1)
+
+            self.catpr6 = convTranspose2d(1, 1, 4, 2, 1)
+            self.catpr5 = convTranspose2d(1, 1, 4, 2, 1)
+            self.catpr4 = convTranspose2d(1, 1, 4, 2, 1)
+            self.catpr3 = convTranspose2d(1, 1, 4, 2, 1)
+            self.catpr2 = convTranspose2d(1, 1, 4, 2, 1)
+
+            self.iconv5 = conv2d(512+1+512, 512, 3, 1, 1)
+            self.iconv4 = conv2d(256+1+512, 256, 3, 1, 1)
+            self.iconv3 = conv2d(128+1+256, 128, 3, 1, 1)
+            self.iconv2 = conv2d(64+1+128, 64, 3, 1, 1)
+            self.iconv1 = conv2d(32+1+64, 32, 3, 1, 1)
+
             self.pr6out = nn.Conv2d(1024, 1, 3, 1, 1)
             self.pr5out = nn.Conv2d(512, 1, 3, 1, 1)
             self.pr4out = nn.Conv2d(256, 1, 3, 1, 1)
             self.pr3out = nn.Conv2d(128, 1, 3, 1, 1)
             self.pr2out = nn.Conv2d(64, 1, 3, 1, 1)
             self.pr1out = nn.Conv2d(32, 1, 3, 1, 1)
+        elif upsample_mode == 2:
+            self.iconv5 = conv2d(1024+1+512, 512, 3, 1, 1)
+            self.iconv4 = conv2d(512+1+512, 256, 3, 1, 1)
+            self.iconv3 = conv2d(256+1+256, 128, 3, 1, 1)
+            self.iconv2 = conv2d(128+1+128, 64, 3, 1, 1)
+            self.iconv1 = conv2d(64+1+64, 32, 3, 1, 1)
 
+            self.catpr6 = convTranspose2d(1, 1, 4, 2, 1)
+            self.catpr5 = convTranspose2d(1, 1, 4, 2, 1)
+            self.catpr4 = convTranspose2d(1, 1, 4, 2, 1)
+            self.catpr3 = convTranspose2d(1, 1, 4, 2, 1)
+            self.catpr2 = convTranspose2d(1, 1, 4, 2, 1)
 
+            self.pr6out = nn.Conv2d(1024, 1, 3, 1, 1)
+            self.pr5out = nn.Conv2d(512, 1, 3, 1, 1)
+            self.pr4out = nn.Conv2d(256, 1, 3, 1, 1)
+            self.pr3out = nn.Conv2d(128, 1, 3, 1, 1)
+            self.pr2out = nn.Conv2d(64, 1, 3, 1, 1)
+            self.pr1out = nn.Conv2d(32, 1, 3, 1, 1)
+        else:
+            raise MyException('UpsampleModeError', 'select upsample mode(0, 1, 2)')
 
     def forward(self, imgl, imgr):
         self.outSize = (imgl.shape[2], imgl.shape[3])
@@ -151,69 +165,69 @@ class DispNetS(nn.Module):
         self.pr6 = self.pr6out(conv6b)
 
         if upsample_mode == 0:
-            X = self.upconv5(X)
-            X = torch.cat((X, self.catpr6(self.pr6), conv5b), dim=1)
+            X = self.upconv5(X)  # 512
+            X = torch.cat((X, self.catpr6(self.pr6), conv5b), dim=1)  # 512+1+512
             self.pr5 = self.pr5out(X)
 
-            X = self.upconv4(X)
-            X = torch.cat((X, self.catpr5(self.pr5), conv4b), dim=1)
+            X = self.upconv4(X)  # 256
+            X = torch.cat((X, self.catpr5(self.pr5), conv4b), dim=1)  # 256+1+512
             self.pr4 = self.pr4out(X)
 
-            X = self.upconv3(X)
-            X = torch.cat((X, self.catpr4(self.pr4), conv3b), dim=1)
+            X = self.upconv3(X)  # 128
+            X = torch.cat((X, self.catpr4(self.pr4), conv3b), dim=1)  # 128+1+256
             self.pr3 = self.pr3out(X)
 
-            X = self.upconv2(X)
-            X = torch.cat((X, self.catpr3(self.pr3), conv2), dim=1)
+            X = self.upconv2(X)  # 64
+            X = torch.cat((X, self.catpr3(self.pr3), conv2), dim=1)  # 64+1+128
             self.pr2 = self.pr2out(X)
 
-            X = self.upconv1(X)
-            X = torch.cat((X, self.catpr2(self.pr2), conv1), dim=1)
+            X = self.upconv1(X)  # 32
+            X = torch.cat((X, self.catpr2(self.pr2), conv1), dim=1)  # 32+1+64
             self.pr1 = self.pr1out(X)
         elif upsample_mode == 1:
-            X = self.upconv5(X)
-            X = self.iconv5(torch.cat((X, self.catpr6(self.pr6), conv5b), dim=1))
+            X = self.upconv5(X)  # 512
+            X = self.iconv5(torch.cat((X, self.catpr6(self.pr6), conv5b), dim=1))  # 512
             self.pr5 = self.pr5out(X)
 
-            X = self.upconv4(X)
-            X = self.iconv4(torch.cat((X, self.catpr5(self.pr5), conv4b), dim=1))
+            X = self.upconv4(X)  # 256
+            X = self.iconv4(torch.cat((X, self.catpr5(self.pr5), conv4b), dim=1))  # 256
             self.pr4 = self.pr4out(X)
 
-            X = self.upconv3(X)
-            X = self.iconv3(torch.cat((X, self.catpr4(self.pr4), conv3b), dim=1))
+            X = self.upconv3(X)  # 128
+            X = self.iconv3(torch.cat((X, self.catpr4(self.pr4), conv3b), dim=1))  # 128
             self.pr3 = self.pr3out(X)
 
-            X = self.upconv2(X)
-            X = self.iconv2(torch.cat((X, self.catpr3(self.pr3), conv2), dim=1))
+            X = self.upconv2(X)  # 64
+            X = self.iconv2(torch.cat((X, self.catpr3(self.pr3), conv2), dim=1))  # 64
             self.pr2 = self.pr2out(X)
 
-            X = self.upconv1(X)
-            X = self.iconv1(torch.cat((X, self.catpr2(self.pr2), conv1), dim=1))
+            X = self.upconv1(X)  # 32
+            X = self.iconv1(torch.cat((X, self.catpr2(self.pr2), conv1), dim=1))  # 32
             self.pr1 = self.pr1out(X)
         elif upsample_mode == 2:
-            X = F.interpolate(X, scale_factor=2, mode='bilinear')
-            X = self.iconv5(torch.cat((X, F.interpolate(self.pr6, scale_factor=2, mode='bilinear'), conv5b), dim=1))
+            X = F.interpolate(X, scale_factor=2, mode='bilinear')  # 1024
+            X = self.iconv5(torch.cat((X, F.interpolate(self.pr6, scale_factor=2, mode='bilinear'), conv5b), dim=1))  # 512
             self.pr5 = self.pr5out(X)
 
-            X = F.interpolate(X, scale_factor=2, mode='bilinear')
-            X = self.iconv4(torch.cat((X, F.interpolate(self.pr5, scale_factor=2, mode='bilinear'), conv4b), dim=1))
+            X = F.interpolate(X, scale_factor=2, mode='bilinear')  # 512
+            X = self.iconv4(torch.cat((X, F.interpolate(self.pr5, scale_factor=2, mode='bilinear'), conv4b), dim=1))  # 256
             self.pr4 = self.pr4out(X)
 
-            X = F.interpolate(X, scale_factor=2, mode='bilinear')
-            X = self.iconv3(torch.cat((X, F.interpolate(self.pr4, scale_factor=2, mode='bilinear'), conv3b), dim=1))
+            X = F.interpolate(X, scale_factor=2, mode='bilinear')  # 256
+            X = self.iconv3(torch.cat((X, F.interpolate(self.pr4, scale_factor=2, mode='bilinear'), conv3b), dim=1))  # 128
             self.pr3 = self.pr3out(X)
 
-            X = F.interpolate(X, scale_factor=2, mode='bilinear')
-            X = self.iconv2(torch.cat((X, F.interpolate(self.pr3, scale_factor=2, mode='bilinear'), conv2), dim=1))
+            X = F.interpolate(X, scale_factor=2, mode='bilinear')  # 128
+            X = self.iconv2(torch.cat((X, F.interpolate(self.pr3, scale_factor=2, mode='bilinear'), conv2), dim=1))  # 64
             self.pr2 = self.pr2out(X)
 
-            X = F.interpolate(X, scale_factor=2, mode='bilinear')
-            X = self.iconv1(torch.cat((X, F.interpolate(self.pr2, scale_factor=2, mode='bilinear'), conv1), dim=1))
+            X = F.interpolate(X, scale_factor=2, mode='bilinear')  # 64
+            X = self.iconv1(torch.cat((X, F.interpolate(self.pr2, scale_factor=2, mode='bilinear'), conv1), dim=1))  # 32
             self.pr1 = self.pr1out(X)
+        else:
+            raise MyException('UpsampleModeError', 'select upsample mode(0, 1, 2)')
 
-        # 为了计算多尺度loss，多尺度训练
         # 将pre1-6上采样到dispL相同维度，再计算loss
-        # 三种上采样方法：转置卷积、插值、反池化，这里选双线性插值
         if self.training:
             self.pr1 = F.interpolate(self.pr1, self.outSize, mode='bilinear')
             self.pr2 = F.interpolate(self.pr2, self.outSize, mode='bilinear')
@@ -243,36 +257,6 @@ class DispNetC(nn.Module):
         self.conv6a = conv2d(512, 1024, 3, 2, 1)
         self.conv6b = conv2d(1024, 1024, 3, 1, 1)
 
-        # # the expanding part
-        # self.upconv5 = convTranspose2d(1024, 512, 4, 2, 1)
-        # self.catpr6 = convTranspose2d(1, 1, 4, 2, 1)
-        # self.iconv5 = conv2d(1025, 512, 3, 1, 1)
-        #
-        # self.upconv4 = convTranspose2d(512, 256, 4, 2, 1)
-        # self.catpr5 = convTranspose2d(1, 1, 4, 2, 1)
-        # self.iconv4 = conv2d(769, 256, 3, 1, 1)
-        #
-        # self.upconv3 = convTranspose2d(256, 128, 4, 2, 1)
-        # self.catpr4 = convTranspose2d(1, 1, 4, 2, 1)
-        # self.iconv3 = conv2d(385, 128, 3, 1, 1)
-        #
-        # self.upconv2 = convTranspose2d(128, 64, 4, 2, 1)
-        # self.catpr3 = convTranspose2d(1, 1, 4, 2, 1)
-        # self.iconv2 = conv2d(64+1+128, 64, 3, 1, 1)
-        #
-        # self.upconv1 = convTranspose2d(64, 32, 4, 2, 1)
-        # self.catpr2 = convTranspose2d(1, 1, 4, 2, 1)
-        # self.iconv1 = conv2d(32+1+64, 32, 3, 1, 1)
-        #
-        # # predict results
-        # self.pr6out = conv2d(1024, 1, 3, 1, 1)
-        # self.pr5out = conv2d(512, 1, 3, 1, 1)
-        # self.pr4out = conv2d(256, 1, 3, 1, 1)
-        # self.pr3out = conv2d(128, 1, 3, 1, 1)
-        # self.pr2out = conv2d(64, 1, 3, 1, 1)
-        # self.pr1out = conv2d(32, 1, 3, 1, 1)
-
-        # the expanding part
         if upsample_mode == 0:
             self.upconv5 = convTranspose2d(1024, 512, 4, 2, 1)
             self.upconv4 = convTranspose2d(512+1+512, 256, 4, 2, 1)
@@ -425,9 +409,7 @@ class DispNetC(nn.Module):
         else:
             raise MyException('UpsampleModeError', 'select upsample mode(0, 1, 2)')
 
-        # 为了计算多尺度loss，多尺度训练
         # 将pre1-6上采样到dispL相同维度，再计算loss
-        # 三种上采样方法：转置卷积、插值、反池化，这里选双线性插值
         if self.training:
             self.pr1 = F.interpolate(self.pr1, self.outSize, mode='bilinear')
             self.pr2 = F.interpolate(self.pr2, self.outSize, mode='bilinear')
